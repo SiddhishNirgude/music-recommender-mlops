@@ -1,0 +1,15 @@
+creation_timestamp: 1764047761178
+current_stage: None
+deployment_job_state: null
+description: null
+last_updated_timestamp: 1764047761178
+model_id: m-fabe68510f3942ae89ffa95e17cf02a3
+name: music-recommender-als
+run_id: e9f8455e92a34760bc6f33bc31df6a1b
+run_link: null
+source: models:/m-fabe68510f3942ae89ffa95e17cf02a3
+status: READY
+status_message: null
+storage_location: file:///Users/siddhishnirgude/Documents/Personal/USA/Semester%203%20MSU/MLOps/Project/music-recommender-mlops/mlruns/867245654567405829/models/m-fabe68510f3942ae89ffa95e17cf02a3/artifacts
+user_id: null
+version: 1

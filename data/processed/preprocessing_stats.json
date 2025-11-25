@@ -1,0 +1,17 @@
+{
+  "original_rows": 17535655,
+  "original_users": 358868,
+  "original_artists": 292363,
+  "rows_dropped_missing": 204,
+  "duplicates_removed": 75,
+  "users_after_filter": 358622,
+  "artists_after_filter": 126442,
+  "rows_after_filter": 17344371,
+  "train_rows": 14021266,
+  "test_rows": 3323105,
+  "matrix_shape": [
+    358622,
+    126442
+  ],
+  "matrix_sparsity": 0.9996908039872217
+}

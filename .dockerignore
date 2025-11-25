@@ -1,0 +1,34 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.venv
+venv/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+mlruns/
+notebooks/
+tests/
+*.log
+
+# DVC
+.dvc/
+*.dvc
+
+# Data (use volumes)
+data/raw/

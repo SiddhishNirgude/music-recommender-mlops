@@ -1,0 +1,41 @@
+# MLOps Music Recommender - Configuration File
+
+# Data Paths
+data:
+  raw_data_path: "data/raw/usersha1-artmbid-artname-plays.tsv"
+  processed_dir: "data/processed"
+  train_file: "data/processed/train_interactions.csv"
+  test_file: "data/processed/test_interactions.csv"
+  user_item_matrix: "data/processed/user_item_matrix.npz"
+  user_mapping: "data/processed/user_mapping.json"
+  artist_mapping: "data/processed/artist_mapping.json"
+  stats_file: "data/processed/preprocessing_stats.json"
+
+# Preprocessing Parameters
+preprocessing:
+  min_user_interactions: 5        # Remove users with fewer interactions
+  min_artist_listeners: 3          # Remove artists with fewer listeners
+  test_size: 0.2                   # 20% test split per user
+  alpha: 40                        # Implicit feedback confidence weight
+  random_seed: 42
+  
+  # For development/testing - set to null for full dataset
+  sample_users: null               # e.g., 10000 for 10K user sample
+  
+# ALS Model Parameters (for later)
+model:
+  factors: 100                     # Number of latent factors
+  regularization: 0.01            # Regularization parameter
+  iterations: 20                   # Training iterations
+  alpha: 40                        # Confidence scaling
+  
+# API Configuration (for later)
+api:
+  host: "0.0.0.0"
+  port: 8000
+  top_k: 10                        # Number of recommendations to return
+  
+# Monitoring (for later)
+monitoring:
+  log_level: "INFO"
+  metrics_port: 9090

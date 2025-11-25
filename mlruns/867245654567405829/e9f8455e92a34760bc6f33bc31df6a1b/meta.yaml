@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/siddhishnirgude/Documents/Personal/USA/Semester%203%20MSU/MLOps/Project/music-recommender-mlops/mlruns/867245654567405829/e9f8455e92a34760bc6f33bc31df6a1b/artifacts
+end_time: 1764047761185
+entry_point_name: ''
+experiment_id: '867245654567405829'
+lifecycle_stage: active
+run_id: e9f8455e92a34760bc6f33bc31df6a1b
+run_name: stately-pig-512
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1764047750896
+status: 3
+tags: []
+user_id: siddhishnirgude
