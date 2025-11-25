@@ -218,3 +218,18 @@ mlruns/
 models/*.pkl
 models/*.npy
 models/*.npz
+
+# Data files (use DVC)
+data/processed/
+data/raw/*.tsv
+
+# MLflow artifacts
+mlruns/
+
+# Model files
+models/*.pkl
+models/*.npy
+models/*.npz
+
+# Large JSON mappings
+data/processed/*.json
