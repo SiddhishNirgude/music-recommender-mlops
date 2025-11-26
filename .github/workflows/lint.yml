@@ -1,0 +1,96 @@
+name: Code Linting
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+
+jobs:
+  lint:
+    name: Python Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black isort mypy pylint
+    
+    - name: Create results directory
+      run: mkdir -p lint-results
+    
+    - name: Run Black (Code Formatting)
+      continue-on-error: true
+      run: |
+        echo "Checking code formatting with Black..."
+        black --check src/ tests/ > lint-results/black.txt 2>&1 || true
+        cat lint-results/black.txt
+    
+    - name: Run isort (Import Sorting)
+      continue-on-error: true
+      run: |
+        echo "Checking import sorting with isort..."
+        isort --check-only src/ tests/ > lint-results/isort.txt 2>&1 || true
+        cat lint-results/isort.txt
+    
+    - name: Run Flake8 (Style Guide)
+      continue-on-error: true
+      run: |
+        echo "Checking style guide compliance with Flake8..."
+        flake8 src/ tests/ \
+          --max-line-length=127 \
+          --extend-ignore=E203,E266,E501,W503 \
+          --exclude=.git,__pycache__,.venv,venv \
+          --statistics > lint-results/flake8.txt 2>&1 || true
+        cat lint-results/flake8.txt
+    
+    - name: Run Pylint (Deep Analysis)
+      continue-on-error: true
+      run: |
+        echo "Running deep code analysis with Pylint..."
+        pylint src/ --exit-zero --output-format=text > lint-results/pylint.txt 2>&1 || true
+        cat lint-results/pylint.txt | head -50
+    
+    - name: Generate Summary
+      if: always()
+      run: |
+        echo "================================"
+        echo "Linting Summary"
+        echo "================================"
+        echo ""
+        echo "Black (Code Formatting):"
+        grep -c "would reformat" lint-results/black.txt || echo "✅ All files formatted correctly"
+        echo ""
+        echo "isort (Import Sorting):"
+        grep -c "would be reformatted" lint-results/isort.txt || echo "✅ All imports sorted correctly"
+        echo ""
+        echo "Flake8 (Style Guide):"
+        tail -1 lint-results/flake8.txt || echo "✅ No style violations"
+        echo ""
+        echo "Pylint Score:"
+        grep "Your code has been rated" lint-results/pylint.txt || echo "Analysis complete"
+        echo ""
+        echo "================================"
+    
+    - name: Upload lint results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: lint-results
+        path: lint-results/
+        retention-days: 30
