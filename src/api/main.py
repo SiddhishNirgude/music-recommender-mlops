@@ -1,52 +1,135 @@
 """
-FastAPI Application for Music Recommender System
+FastAPI Application with Prometheus Metrics
+
+This version includes comprehensive monitoring:
+- Request counts by endpoint
+- Response times
+- Error rates
+- Mood popularity tracking
 """
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-import logging
 from contextlib import asynccontextmanager
+import logging
+from typing import Optional
+import time
 
-from .models import (
+# Prometheus imports
+from prometheus_client import Counter, Histogram, Gauge, make_asgi_app
+from prometheus_client import REGISTRY, CollectorRegistry
+
+from src.api.models import (
     RecommendRequest,
     RecommendResponse,
-    RecommendationItem,
     SimilarArtistRequest,
     SimilarArtistResponse,
     ChartsResponse,
-    ChartItem,
     HealthResponse,
-    ErrorResponse,
-    RecommendationType
+    MoodsResponse
 )
-from .recommender import RecommenderService
-from .mood_profiles import get_all_moods, get_mood_info
+from src.api.recommender import RecommenderService
+from src.api.mood_profiles import MOOD_PROFILES, get_mood_seed_artists
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global recommender service
-recommender = None
+# Global recommender instance
+recommender: Optional[RecommenderService] = None
 
+# ============================================================================
+# PROMETHEUS METRICS DEFINITIONS
+# ============================================================================
+
+# Request counters
+http_requests_total = Counter(
+    'http_requests_total',
+    'Total HTTP requests',
+    ['method', 'endpoint', 'status']
+)
+
+# Request duration histogram
+http_request_duration_seconds = Histogram(
+    'http_request_duration_seconds',
+    'HTTP request latency',
+    ['method', 'endpoint']
+)
+
+# Recommendation-specific metrics
+recommendations_total = Counter(
+    'recommendations_total',
+    'Total recommendations served',
+    ['type']
+)
+
+mood_requests = Counter(
+    'mood_requests_total',
+    'Mood recommendation requests',
+    ['mood']
+)
+
+similar_artist_requests = Counter(
+    'similar_artist_requests_total',
+    'Similar artist search requests'
+)
+
+charts_requests = Counter(
+    'charts_requests_total',
+    'Top charts requests'
+)
+
+# Model metrics
+model_loaded = Gauge(
+    'model_loaded',
+    'Whether the model is loaded (1) or not (0)'
+)
+
+model_users = Gauge(
+    'model_users_total',
+    'Total number of users in model'
+)
+
+model_artists = Gauge(
+    'model_artists_total',
+    'Total number of artists in model'
+)
+
+# Error tracking
+api_errors_total = Counter(
+    'api_errors_total',
+    'Total API errors',
+    ['endpoint', 'error_type']
+)
+
+# ============================================================================
+# FASTAPI LIFESPAN & INITIALIZATION
+# ============================================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan events for FastAPI"""
+    """
+    Lifespan context manager for startup and shutdown events
+    """
     global recommender
     
     # Startup
     logger.info("🚀 Starting Music Recommender API...")
+    
     try:
         recommender = RecommenderService()
         logger.info("✅ Recommender service loaded successfully")
+        
+        # Set model metrics
+        model_loaded.set(1)
+        if recommender.model:
+            model_users.set(recommender.model.user_factors.shape[0])
+            model_artists.set(recommender.model.item_factors.shape[0])
+        
     except Exception as e:
         logger.error(f"❌ Failed to load recommender: {e}")
-        raise
+        model_loaded.set(0)
+        recommender = None
     
     yield
     
@@ -57,7 +140,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="Music Recommender API",
-    description="ALS-based music recommendation system with mood profiles, artist similarity, and more",
+    description="ALS-based music recommendation system with monitoring",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -65,12 +148,69 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Mount Prometheus metrics endpoint
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
+# ============================================================================
+# MIDDLEWARE FOR AUTOMATIC METRICS COLLECTION
+# ============================================================================
+
+@app.middleware("http")
+async def add_metrics_middleware(request, call_next):
+    """
+    Middleware to automatically collect metrics for all requests
+    """
+    start_time = time.time()
+    
+    # Get endpoint path
+    endpoint = request.url.path
+    method = request.method
+    
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        
+        # Record metrics
+        http_requests_total.labels(
+            method=method,
+            endpoint=endpoint,
+            status=status
+        ).inc()
+        
+        duration = time.time() - start_time
+        http_request_duration_seconds.labels(
+            method=method,
+            endpoint=endpoint
+        ).observe(duration)
+        
+        return response
+        
+    except Exception as e:
+        # Record error
+        api_errors_total.labels(
+            endpoint=endpoint,
+            error_type=type(e).__name__
+        ).inc()
+        
+        duration = time.time() - start_time
+        http_request_duration_seconds.labels(
+            method=method,
+            endpoint=endpoint
+        ).observe(duration)
+        
+        raise
+
+
+# ============================================================================
+# API ENDPOINTS
+# ============================================================================
 
 @app.get("/", tags=["Root"])
 async def root():
@@ -83,7 +223,8 @@ async def root():
             "recommend": "/recommend",
             "similar": "/similar",
             "charts": "/charts",
-            "moods": "/moods"
+            "moods": "/moods",
+            "metrics": "/metrics"
         }
     }
 
@@ -92,208 +233,275 @@ async def root():
 async def health_check():
     """
     Health check endpoint
-    
-    Returns service status and model information
+    Returns model status and metadata
     """
-    try:
-        model_info = recommender.get_model_info()
-        
-        return HealthResponse(
-            status="healthy",
-            model_loaded=True,
-            model_info=model_info
-        )
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
+    if recommender is None:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Service unhealthy: {str(e)}"
+            status_code=503,
+            detail="Recommender service not initialized"
         )
+    
+    return HealthResponse(
+        status="healthy",
+        model_loaded=recommender.model is not None,
+        model_info={
+            "n_users": recommender.model.user_factors.shape[0] if recommender.model else 0,
+            "n_artists": recommender.model.item_factors.shape[0] if recommender.model else 0,
+            "n_factors": recommender.model.user_factors.shape[1] if recommender.model else 0,
+        }
+    )
 
 
 @app.post("/recommend", response_model=RecommendResponse, tags=["Recommendations"])
 async def get_recommendations(request: RecommendRequest):
     """
-    Get recommendations based on different criteria
+    Get music recommendations
     
-    Supports:
-    - User-based: Get recommendations for a specific user
-    - Mood-based: Get recommendations based on mood
-    - Random: Get recommendations for a random user
+    Supports three types:
+    - mood: Based on mood profiles
+    - user: Based on user ID
+    - random: Random user recommendations
     """
+    if recommender is None:
+        api_errors_total.labels(
+            endpoint="/recommend",
+            error_type="ServiceUnavailable"
+        ).inc()
+        raise HTTPException(
+            status_code=503,
+            detail="Recommender service not available"
+        )
+    
     try:
-        recommendations = []
-        metadata = {}
+        # Track recommendation type
+        recommendations_total.labels(type=request.type).inc()
         
-        if request.type == RecommendationType.USER:
-            if not request.user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="user_id is required for user-based recommendations"
-                )
-            
-            recs = recommender.get_recommendations_by_user(request.user_id, k=request.k)
-            recommendations = [
-                RecommendationItem(artist_name=artist, score=score, rank=i+1)
-                for i, (artist, score) in enumerate(recs)
-            ]
-            metadata = {"user_id": request.user_id[:20] + "..."}
-        
-        elif request.type == RecommendationType.MOOD:
+        if request.type == "mood":
             if not request.mood:
+                api_errors_total.labels(
+                    endpoint="/recommend",
+                    error_type="MissingParameter"
+                ).inc()
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="mood is required for mood-based recommendations"
+                    status_code=400,
+                    detail="mood parameter required for mood-based recommendations"
                 )
             
-            recs, seed_artists = recommender.get_recommendations_by_mood(request.mood, k=request.k)
-            recommendations = [
-                RecommendationItem(artist_name=artist, score=score, rank=i+1)
-                for i, (artist, score) in enumerate(recs)
-            ]
+            # Track mood popularity
+            mood_requests.labels(mood=request.mood).inc()
             
-            mood_info = get_mood_info(request.mood)
-            metadata = {
-                "mood": request.mood,
-                "mood_name": mood_info["name"] if mood_info else request.mood,
-                "seed_artists": seed_artists
-            }
-        
-        elif request.type == RecommendationType.RANDOM:
-            recs, user_id = recommender.get_random_recommendations(k=request.k)
-            recommendations = [
-                RecommendationItem(artist_name=artist, score=score, rank=i+1)
-                for i, (artist, score) in enumerate(recs)
-            ]
-            metadata = {"random_user": user_id[:20] + "..."}
-        
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported recommendation type: {request.type}"
+            # Get mood recommendations
+            recs, seed_artists = recommender.get_recommendations_by_mood(
+                request.mood,
+                k=request.k
+            )
+            
+            return RecommendResponse(
+                recommendations=[
+                    {
+                        "artist_name": artist,
+                        "score": float(score),
+                        "rank": i + 1
+                    }
+                    for i, (artist, score) in enumerate(recs)
+                ],
+                type="mood",
+                metadata={
+                    "mood": request.mood,
+                    "seed_artists": seed_artists
+                }
             )
         
-        return RecommendResponse(
-            recommendations=recommendations,
-            type=request.type.value,
-            metadata=metadata
-        )
+        elif request.type == "user":
+            if request.user_id is None:
+                api_errors_total.labels(
+                    endpoint="/recommend",
+                    error_type="MissingParameter"
+                ).inc()
+                raise HTTPException(
+                    status_code=400,
+                    detail="user_id required for user-based recommendations"
+                )
+            
+            recs = recommender.get_user_recommendations(
+                request.user_id,
+                k=request.k
+            )
+            
+            return RecommendResponse(
+                recommendations=[
+                    {
+                        "artist_name": artist,
+                        "score": float(score),
+                        "rank": i + 1
+                    }
+                    for i, (artist, score) in enumerate(recs)
+                ],
+                type="user",
+                metadata={"user_id": request.user_id}
+            )
+        
+        elif request.type == "random":
+            recs, user_id = recommender.get_random_recommendations(k=request.k)
+            
+            return RecommendResponse(
+                recommendations=[
+                    {
+                        "artist_name": artist,
+                        "score": float(score),
+                        "rank": i + 1
+                    }
+                    for i, (artist, score) in enumerate(recs)
+                ],
+                type="random",
+                metadata={"sampled_user_id": user_id}
+            )
+        
+        else:
+            api_errors_total.labels(
+                endpoint="/recommend",
+                error_type="InvalidType"
+            ).inc()
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid recommendation type: {request.type}"
+            )
     
-    except ValueError as e:
-        logger.warning(f"Invalid request: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error generating recommendations: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error generating recommendations: {str(e)}"
-        )
+        api_errors_total.labels(
+            endpoint="/recommend",
+            error_type=type(e).__name__
+        ).inc()
+        logger.error(f"Error in recommend endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/similar", response_model=SimilarArtistResponse, tags=["Recommendations"])
 async def get_similar_artists(request: SimilarArtistRequest):
     """
-    Get similar artists based on collaborative filtering
-    
-    Uses artist embedding vectors to find similar artists
+    Get similar artists based on artist name
+    Uses cosine similarity on item factors
     """
+    if recommender is None:
+        api_errors_total.labels(
+            endpoint="/similar",
+            error_type="ServiceUnavailable"
+        ).inc()
+        raise HTTPException(
+            status_code=503,
+            detail="Recommender service not available"
+        )
+    
     try:
-        similar = recommender.get_similar_artists(request.artist_name, k=request.k)
+        # Track similar artist requests
+        similar_artist_requests.inc()
         
-        similar_artists = [
-            RecommendationItem(artist_name=artist, score=score, rank=i+1)
-            for i, (artist, score) in enumerate(similar)
-        ]
+        similar = recommender.get_similar_artists(
+            request.artist_name,
+            k=request.k
+        )
         
         return SimilarArtistResponse(
             query_artist=request.artist_name,
-            similar_artists=similar_artists
+            similar_artists=[
+                {
+                    "artist_name": artist,
+                    "score": float(similarity),
+                    "rank": i + 1
+                }
+                for i, (artist, similarity) in enumerate(similar)
+            ]
         )
     
     except ValueError as e:
-        logger.warning(f"Artist not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        api_errors_total.labels(
+            endpoint="/similar",
+            error_type="ArtistNotFound"
+        ).inc()
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"Error finding similar artists: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error finding similar artists: {str(e)}"
-        )
+        api_errors_total.labels(
+            endpoint="/similar",
+            error_type=type(e).__name__
+        ).inc()
+        logger.error(f"Error in similar endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/charts", response_model=ChartsResponse, tags=["Charts"])
-async def get_charts(k: int = 20):
+async def get_top_charts(k: int = 20):
     """
-    Get top charts (most popular artists)
+    Get top K most popular artists by play count
+    """
+    if recommender is None:
+        api_errors_total.labels(
+            endpoint="/charts",
+            error_type="ServiceUnavailable"
+        ).inc()
+        raise HTTPException(
+            status_code=503,
+            detail="Recommender service not available"
+        )
     
-    Returns artists sorted by total play count
-    """
     try:
-        if k < 1 or k > 100:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="k must be between 1 and 100"
-            )
+        # Track charts requests
+        charts_requests.inc()
         
         charts = recommender.get_top_charts(k=k)
         
-        chart_items = [
-            ChartItem(
-                artist_name=artist,
-                play_count=plays,
-                listener_count=listeners,
-                rank=i+1
-            )
-            for i, (artist, plays, listeners) in enumerate(charts)
-        ]
-        
         return ChartsResponse(
-            charts=chart_items,
-            total_artists=len(recommender.artist_mapping)
+            charts=[
+                {
+                    "artist_name": artist,
+                    "play_count": int(plays),
+                    "listener_count": int(listeners),
+                    "rank": i + 1
+                }
+                for i, (artist, plays, listeners) in enumerate(charts)
+            ]
         )
     
     except Exception as e:
-        logger.error(f"Error getting charts: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting charts: {str(e)}"
-        )
+        api_errors_total.labels(
+            endpoint="/charts",
+            error_type=type(e).__name__
+        ).inc()
+        logger.error(f"Error in charts endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/moods", tags=["Metadata"])
-async def get_moods():
+@app.get("/moods", response_model=MoodsResponse, tags=["Moods"])
+async def get_available_moods():
     """
     Get all available mood profiles
-    
-    Returns list of moods with their metadata
     """
-    try:
-        moods = get_all_moods()
-        return {"moods": moods}
-    except Exception as e:
-        logger.error(f"Error getting moods: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting moods: {str(e)}"
-        )
+    return MoodsResponse(moods=MOOD_PROFILES)
 
+
+# ============================================================================
+# EXCEPTION HANDLERS
+# ============================================================================
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    """Global exception handler"""
+    """
+    Global exception handler
+    """
+    api_errors_total.labels(
+        endpoint=request.url.path,
+        error_type=type(exc).__name__
+    ).inc()
+    
     logger.error(f"Unhandled exception: {exc}")
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"error": "Internal server error", "detail": str(exc)}
-    )
+    
+    return {
+        "error": str(exc),
+        "type": type(exc).__name__
+    }
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

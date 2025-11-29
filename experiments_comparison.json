@@ -1,0 +1,86 @@
+[
+  {
+    "Rank":1,
+    "Run ID":"0f319a50",
+    "Factors":150,
+    "Iterations":25,
+    "Regularization":0.01,
+    "Precision@10":0.0136919335,
+    "MAP@10":0.0087996915,
+    "NDCG@10":0.0144346612,
+    "Training Time (min)":243.1769023021,
+    "Timestamp":1764214535641
+  },
+  {
+    "Rank":2,
+    "Run ID":"f47dab8f",
+    "Factors":125,
+    "Iterations":25,
+    "Regularization":0.01,
+    "Precision@10":0.0119994413,
+    "MAP@10":0.0080575953,
+    "NDCG@10":0.0130913066,
+    "Training Time (min)":13.2317382495,
+    "Timestamp":1764213444249
+  },
+  {
+    "Rank":3,
+    "Run ID":"82512f42",
+    "Factors":100,
+    "Iterations":20,
+    "Regularization":0.01,
+    "Precision@10":0.008530243,
+    "MAP@10":0.0063179418,
+    "NDCG@10":0.0100198829,
+    "Training Time (min)":18.3749869506,
+    "Timestamp":1764212076053
+  },
+  {
+    "Rank":4,
+    "Run ID":"3e7f542d",
+    "Factors":100,
+    "Iterations":20,
+    "Regularization":0.01,
+    "Precision@10":0.008530243,
+    "MAP@10":0.0063179418,
+    "NDCG@10":0.0100198829,
+    "Training Time (min)":6.4323818326,
+    "Timestamp":1764209091041
+  },
+  {
+    "Rank":5,
+    "Run ID":"5aa6379c",
+    "Factors":75,
+    "Iterations":20,
+    "Regularization":0.01,
+    "Precision@10":0.0068603447,
+    "MAP@10":0.0052802089,
+    "NDCG@10":0.0082931205,
+    "Training Time (min)":5.6535740336,
+    "Timestamp":1764211484956
+  },
+  {
+    "Rank":6,
+    "Run ID":"18784a65",
+    "Factors":50,
+    "Iterations":15,
+    "Regularization":0.01,
+    "Precision@10":0.0034342804,
+    "MAP@10":0.0029644745,
+    "NDCG@10":0.0045388041,
+    "Training Time (min)":3.7251760006,
+    "Timestamp":1764211032167
+  },
+  {
+    "Rank":7,
+    "Run ID":"4c920fdf",
+    "Factors":100,
+    "Iterations":20,
+    "Regularization":0.01,
+    "Precision@10":0.0,
+    "MAP@10":0.0,
+    "NDCG@10":0.0,
+    "Training Time (min)":0.0,
+    "Timestamp":1764208429620
+  }
+]

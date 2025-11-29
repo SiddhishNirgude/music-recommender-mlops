@@ -1,0 +1,12 @@
+{
+  "Rank": 1,
+  "Run ID": "0f319a50",
+  "Factors": 150,
+  "Iterations": 25,
+  "Regularization": 0.01,
+  "Precision@10": 0.013691933549139787,
+  "MAP@10": 0.008799691534876681,
+  "NDCG@10": 0.014434661157495872,
+  "Training Time (min)": 243.1769023021062,
+  "Timestamp": 1764214535641
+}
