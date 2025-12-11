@@ -1,0 +1,51 @@
+services:
+  # FastAPI Backend Service
+  - type: web
+    name: music-recommender-api
+    env: docker
+    dockerfilePath: ./docker/Dockerfile.api
+    dockerContext: .
+    region: oregon  # Change to your preferred region
+    plan: starter  # free, starter, standard, pro, pro plus, pro max
+    branch: main
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: PORT
+        value: 8000
+      # AWS credentials for DVC to pull data from S3
+      # These should be set as secret environment variables in Render dashboard
+      - key: AWS_ACCESS_KEY_ID
+        sync: false  # Set manually in Render dashboard as secret
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false  # Set manually in Render dashboard as secret
+      - key: AWS_DEFAULT_REGION
+        value: us-east-1  # Change to your S3 bucket region
+
+  # Streamlit Frontend Service
+  - type: web
+    name: music-recommender-ui
+    env: docker
+    dockerfilePath: ./docker/Dockerfile.streamlit
+    dockerContext: .
+    region: oregon  # Should match API region for lower latency
+    plan: starter
+    branch: main
+    healthCheckPath: /_stcore/health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: PORT
+        value: 8501
+      # API URL - will be set after API service is deployed
+      # Format: https://<your-api-service-name>.onrender.com
+      - key: API_BASE_URL
+        sync: false  # Set manually after API is deployed
+
+# Note: Prometheus and Grafana are not included in this Render deployment
+# Render provides built-in metrics and logs instead
+# For advanced monitoring, consider using external services like:
+# - Datadog
+# - New Relic
+# - Render's built-in metrics dashboard

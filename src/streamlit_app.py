@@ -7,11 +7,12 @@ import streamlit as st
 import requests
 import pandas as pd
 import json
+import os
 from typing import List, Dict, Optional
 import time
 
 # Configuration
-API_BASE_URL = "http://api:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # Page configuration
 st.set_page_config(
@@ -557,9 +558,8 @@ def main():
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Quick Links")
-    st.sidebar.markdown("- [API Docs](http://localhost:8000/docs)")
+    st.sidebar.markdown("- [API Docs]({API_URL}/docs)")
     st.sidebar.markdown("- [GitHub Repo](#)")
-    st.sidebar.markdown("- [MLflow UI](http://localhost:5000)")
     
     st.sidebar.markdown("---")
     st.sidebar.caption("MLOps Project © 2025")

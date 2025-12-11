@@ -23,11 +23,21 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
+# Copy DVC configuration (for pulling data from S3)
+COPY .dvc/ ./.dvc/
+COPY data/raw/*.dvc ./data/raw/
+
 # Copy application code
 COPY src/ ./src/
 COPY configs/ ./configs/
 COPY models/ ./models/
-COPY data/processed/ ./data/processed/
+
+# Copy startup script for Render deployment
+COPY docker/start-render.sh /app/start-render.sh
+RUN chmod +x /app/start-render.sh
+
+# Ensure data directories exist
+RUN mkdir -p /app/data/processed /app/data/raw
 
 # Expose port
 EXPOSE 8000
@@ -37,4 +47,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run FastAPI
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# For production (Render): uses startup script with DVC pull
+# For local dev (docker-compose): can override with direct uvicorn command
+CMD ["/app/start-render.sh"]

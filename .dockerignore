@@ -1,34 +1,43 @@
-# Git
-.git
+# DVC files - Keep .dvc config but exclude cache
+.dvc/cache
+.dvc/tmp
+.dvcignore
+
+# Git files
+.git/
 .gitignore
 
-# Python
-__pycache__
-*.py[cod]
-*$py.class
-*.so
-.venv
-venv/
-ENV/
+# Docker files
+.dockerignore
+docker-compose.yml
 
-# IDEs
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# MLflow tracking
+mlruns/
+
+# Notebooks
+notebooks/
+
+# Local data
+data/raw/
+data/processed/
+
+# Test reports
+.pytest_cache/
+htmlcov/
+.coverage
+
+# IDE files
 .vscode/
 .idea/
-*.swp
 
-# OS
+# OS files
 .DS_Store
-Thumbs.db
-
-# Project specific
-mlruns/
-notebooks/
-tests/
-*.log
-
-# DVC
-.dvc/
-*.dvc
-
-# Data (use volumes)
-data/raw/

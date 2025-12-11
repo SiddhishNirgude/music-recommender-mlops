@@ -17,6 +17,8 @@ services:
       - music-recommender-network
     environment:
       - PYTHONUNBUFFERED=1
+    # Override CMD for local dev (models are mounted, no need for DVC pull)
+    command: ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

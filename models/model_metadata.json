@@ -1,14 +1,9 @@
 {
   "model_type": "ALS",
-  "n_users": 358622,
-  "n_artists": 126442,
-  "factors": 100,
-  "regularization": 0.01,
-  "iterations": 20,
-  "alpha": 40,
-  "training_time_minutes": 5.1605949322382605,
-  "metrics": {
-    "test_users": 358622,
-    "test_interactions": 3323105
-  }
+  "n_users": 126442,
+  "n_items": 358622,
+  "n_factors": 100,
+  "trained_at": "2025-12-10T20:56:11.152064",
+  "library": "implicit",
+  "version": "1.0"
 }
